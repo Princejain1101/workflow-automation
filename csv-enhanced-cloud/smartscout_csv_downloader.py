@@ -1702,35 +1702,38 @@ def collect_brand_data(brand_name: str, return_result=False, headless=False):
                 
                 # Look for the brand name in search results
                 print(f"Looking for '{brand_name}' in search results...")
+                # EXACT MATCHES ONLY - No partial matching to prevent "Solvite" matching "Solvitek"
                 brand_selectors = [
-                    f'a:has-text("{brand_name}")',
-                    f'button:has-text("{brand_name}")',  
-                    f'[title*="{brand_name}" i]',
-                    f':text-is("{brand_name}")',
-                    f':text("{brand_name}")',
+                    f':text-is("{brand_name}")',  # Exact text match only
+                    f'[title="{brand_name}"]',  # Exact title match only
                 ]
                 
                 brand_link = None
-                # Try multiple times with increasing timeouts
+                # Try multiple times with scrolling to find brands further down
                 found = False
-                for attempt in range(3):
-                    print(f"Search attempt {attempt + 1}/3...")
+                for attempt in range(5):  # Increased attempts to allow for scrolling
+                    print(f"Search attempt {attempt + 1}/5...")
+                    
+                    # Try to find the brand without scrolling first
                     for selector in brand_selectors:
                         try:
                             brand_link = page.locator(selector).first
-                            if brand_link.is_visible(timeout=3000):
+                            if brand_link.is_visible(timeout=2000):
                                 print(f"✅ Found brand link with selector: {selector}")
                                 found = True
                                 break
                         except:
                             continue
                     
-                    if found:  # Exit outer loop if found
+                    if found:  # Exit if found
                         break
                     
-                    if attempt < 2:  # Don't wait after last attempt
-                        print(f"⏳ Brand not found yet, waiting 2 more seconds...")
-                        time.sleep(2)
+                    # If not found, scroll down to load more results
+                    if attempt < 4:  # Don't scroll after last attempt
+                        print(f"⏳ Brand not found yet, scrolling down to load more results...")
+                        # Scroll to bottom of page to trigger loading more results
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        time.sleep(2)  # Wait for more results to load
                 
                 if brand_link and brand_link.is_visible():
                     print(f"📊 Clicking on '{brand_name}' to open brand page...")
@@ -1936,36 +1939,53 @@ def download_html_only(brand_name: str, headless=False, return_result=False, htm
             # 2. Look for the specific brand report link
             print(f"Looking for '{brand_name}' report link...")
             
-            # Try to find a link or button that contains the brand name
+            # EXACT MATCHES ONLY - No partial matching to prevent "Solvite" matching "Solvitek"
             brand_selectors = [
-                f'a:has-text("{brand_name}")',
-                f'button:has-text("{brand_name}")',
-                f'[title*="{brand_name}" i]',
-                f'[data-brand*="{brand_name}" i]',
-                f':text-is("{brand_name}")',
-                f':text("{brand_name}")',
+                f':text-is("{brand_name}")',  # Exact text match only
+                f'[title="{brand_name}"]',  # Exact title match only
+                f'[data-brand="{brand_name}"]',  # Exact data attribute only
             ]
             
             brand_link = None
-            for selector in brand_selectors:
-                try:
-                    brand_link = page.locator(selector).first
-                    if brand_link.is_visible(timeout=2000):
-                        print(f"Found brand report with selector: {selector}")
-                        break
-                except:
-                    continue
+            # Try multiple times with scrolling to find brands further down
+            found = False
+            for attempt in range(5):  # Increased attempts to allow for scrolling
+                print(f"Download search attempt {attempt + 1}/5...")
+                
+                # Try to find the brand without scrolling first
+                for selector in brand_selectors:
+                    try:
+                        brand_link = page.locator(selector).first
+                        if brand_link.is_visible(timeout=2000):
+                            print(f"✅ Found brand report with selector: {selector}")
+                            found = True
+                            break
+                    except:
+                        continue
+                
+                if found:  # Exit if found
+                    break
+                
+                # If not found, scroll down to load more results
+                if attempt < 4:  # Don't scroll after last attempt
+                    print(f"⏳ Brand report not found yet, scrolling down to load more results...")
+                    # Scroll to bottom of page to trigger loading more results
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    time.sleep(2)  # Wait for more results to load
             
             if not brand_link or not brand_link.is_visible():
-                # Try a more general approach - look for any clickable element containing brand name
+                # EXACT MATCHES ONLY - No partial matching to prevent "Solvite" matching "Solvitek"
+                print(f"🔍 Trying exact text search for '{brand_name}'...")
                 try:
-                    brand_link = page.get_by_text(brand_name, exact=False).first
+                    brand_link = page.get_by_text(brand_name, exact=True).first
                     if brand_link.is_visible(timeout=2000):
-                        print("Found brand report using text search")
+                        print("✅ Found brand report using exact text search")
+                    else:
+                        raise Exception("Exact match not found")
                 except:
-                    print(f"❌ Could not find brand report for '{brand_name}'")
+                    print(f"❌ Could not find exact match for brand report '{brand_name}'")
                     print("Available reports on page:")
-                    # Try to list available reports
+                    # Try to list available reports for debugging
                     try:
                         reports = page.locator('a, button').all()
                         for report in reports[:10]:
